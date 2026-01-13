@@ -1,8 +1,9 @@
 from typing import Tuple, Any, Callable
 from .constants import OSC_LISTEN_PORT, OSC_RESPONSE_PORT
-from ..pythonosc.osc_message import OscMessage, ParseError
-from ..pythonosc.osc_bundle import OscBundle
-from ..pythonosc.osc_message_builder import OscMessageBuilder, BuildError
+# Live 12 fix: use full package path (relative imports fail, bare module name not found)
+from AbletonOSC.pythonosc.osc_message import OscMessage, ParseError
+from AbletonOSC.pythonosc.osc_bundle import OscBundle
+from AbletonOSC.pythonosc.osc_message_builder import OscMessageBuilder, BuildError
 
 import re
 import errno
