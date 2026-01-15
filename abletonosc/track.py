@@ -136,6 +136,19 @@ class TrackHandler(AbletonOSCHandler):
         self.osc_server.add_handler("/live/track/get/arrangement_clips/length", create_track_callback(track_get_arrangement_clip_lengths))
         self.osc_server.add_handler("/live/track/get/arrangement_clips/start_time", create_track_callback(track_get_arrangement_clip_start_times))
 
+        def track_duplicate_clip_to_arrangement(track, params):
+            """
+            Duplicate a session clip to arrangement view at a specific time.
+            params: (clip_slot_index, time_in_beats)
+            """
+            clip_slot_index = int(params[0])
+            time = float(params[1])
+            clip_slot = track.clip_slots[clip_slot_index]
+            if clip_slot.clip:
+                track.duplicate_clip_to_arrangement(clip_slot.clip, time)
+
+        self.osc_server.add_handler("/live/track/duplicate_clip_to_arrangement", create_track_callback(track_duplicate_clip_to_arrangement))
+
         def track_get_num_devices(track, _):
             return len(track.devices),
 
