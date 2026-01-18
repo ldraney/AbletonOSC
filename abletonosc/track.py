@@ -1,4 +1,5 @@
 from typing import Tuple, Any, Callable, Optional
+import Live
 from .handler import AbletonOSCHandler
 
 
@@ -107,6 +108,48 @@ class TrackHandler(AbletonOSCHandler):
             track.clip_slots[clip_index].delete_clip()
 
         self.osc_server.add_handler("/live/track/delete_clip", create_track_callback(track_delete_clip))
+
+        #--------------------------------------------------------------------------------
+        # Insert device by URI/name
+        # Usage: /live/track/insert_device <track_index> <device_uri> [device_index]
+        # Example: /live/track/insert_device 0 "Reverb" -1
+        #--------------------------------------------------------------------------------
+        def track_insert_device(track, params: Tuple[Any]):
+            device_uri = str(params[0])
+            device_index = int(params[1]) if len(params) > 1 else -1
+            self.logger.info("Inserting device '%s' at index %d" % (device_uri, device_index))
+
+            # Use the browser to load the device
+            application = Live.Application.get_application()
+            browser = application.browser
+
+            # Search for the device in available items
+            # Try instruments first, then audio effects, then midi effects
+            search_locations = [
+                browser.instruments,
+                browser.audio_effects,
+                browser.midi_effects,
+                browser.drums,
+                browser.sounds,
+            ]
+
+            device_item = None
+            for location in search_locations:
+                for item in location.children:
+                    if item.name == device_uri or device_uri in item.name:
+                        device_item = item
+                        break
+                if device_item:
+                    break
+
+            if device_item:
+                browser.load_item(device_item)
+                return (len(track.devices) - 1,)
+            else:
+                self.logger.warning("Device not found: %s" % device_uri)
+                return (-1,)
+
+        self.osc_server.add_handler("/live/track/insert_device", create_track_callback(track_insert_device))
 
         def track_get_clip_names(track, _):
             return tuple(clip_slot.clip.name if clip_slot.clip else None for clip_slot in track.clip_slots)
