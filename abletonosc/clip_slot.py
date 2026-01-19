@@ -35,6 +35,7 @@ class ClipSlotHandler(AbletonOSCHandler):
             "controls_other_clips",
             "is_group_slot",
             "is_playing",
+            "is_recording",
             "is_triggered",
             "playing_status",
             "will_record_on_start",
