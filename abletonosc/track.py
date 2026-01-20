@@ -113,6 +113,9 @@ class TrackHandler(AbletonOSCHandler):
         # Insert device by URI/name
         # Usage: /live/track/insert_device <track_index> <device_uri> [device_index]
         # Example: /live/track/insert_device 0 "Reverb" -1
+        #
+        # Enhanced to search recursively through all packs if not found in
+        # standard browser locations.
         #--------------------------------------------------------------------------------
         def track_insert_device(track, params: Tuple[Any]):
             device_uri = str(params[0])
@@ -134,20 +137,90 @@ class TrackHandler(AbletonOSCHandler):
             ]
 
             device_item = None
+            query_lower = device_uri.lower()
+
+            # First: Search top-level items in standard locations
+            # (matches both exact names and partial names)
             for location in search_locations:
-                for item in location.children:
-                    if item.name == device_uri or device_uri in item.name:
-                        device_item = item
-                        break
+                try:
+                    for item in location.children:
+                        if item.name == device_uri or device_uri in item.name:
+                            device_item = item
+                            self.logger.info("Found item at top-level: %s" % item.name)
+                            break
+                except Exception as e:
+                    self.logger.debug("Error iterating %s: %s" % (location, str(e)))
                 if device_item:
                     break
 
+            # Second: If not found, search one level deep in standard locations
+            # (for presets inside folders like "Analog" folder)
+            if not device_item:
+                self.logger.info("Not found at top-level, searching one level deep...")
+                for location in search_locations:
+                    try:
+                        for folder in location.iter_children:
+                            if folder.is_folder:
+                                # If folder name matches, get first loadable child
+                                if folder.name.lower() == query_lower or query_lower in folder.name.lower():
+                                    for preset in folder.iter_children:
+                                        if preset.is_loadable:
+                                            device_item = preset
+                                            self.logger.info("Found preset in matching folder '%s': %s" % (folder.name, preset.name))
+                                            break
+                                    if device_item:
+                                        break
+                                # Also search child items by name
+                                for preset in folder.iter_children:
+                                    if query_lower in preset.name.lower():
+                                        device_item = preset
+                                        self.logger.info("Found matching item in folder '%s': %s" % (folder.name, preset.name))
+                                        break
+                                if device_item:
+                                    break
+                    except Exception as e:
+                        self.logger.debug("Error searching folder: %s" % str(e))
+                    if device_item:
+                        break
+
             if device_item:
                 browser.load_item(device_item)
+                self.logger.info("Loaded device: %s" % device_item.name)
                 return (len(track.devices) - 1,)
             else:
                 self.logger.warning("Device not found: %s" % device_uri)
                 return (-1,)
+
+        def _recursive_search(item, query, max_depth):
+            """Recursively search for a loadable item matching the query.
+
+            Args:
+                item: Browser item to search
+                query: Lowercase search string
+                max_depth: Maximum recursion depth
+
+            Returns:
+                Matching browser item or None
+            """
+            if max_depth <= 0:
+                return None
+
+            try:
+                for child in item.iter_children:
+                    # Check if this item matches and is loadable
+                    if child.is_loadable:
+                        if child.name.lower() == query or query in child.name.lower():
+                            return child
+
+                    # Recurse into folders
+                    if child.is_folder:
+                        result = _recursive_search(child, query, max_depth - 1)
+                        if result:
+                            return result
+            except Exception as e:
+                pass  # Silently continue on iteration errors
+
+            return None
 
         self.osc_server.add_handler("/live/track/insert_device", create_track_callback(track_insert_device))
 
